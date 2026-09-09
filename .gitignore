@@ -2,3 +2,5 @@
 .omp/
 .pi/
 openspec/
+node_modules/
+dist/
