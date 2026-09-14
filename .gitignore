@@ -1,4 +1,4 @@
-# AI scaffolding / spec tooling (local-only, never commit)
+# Local tooling / spec files (never commit)
 .omp/
 .pi/
 openspec/
