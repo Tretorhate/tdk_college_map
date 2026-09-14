@@ -18,10 +18,10 @@ const dict = {
   lightTheme: { kk: 'Ашық', ru: 'Светлая' },
   darkTheme: { kk: 'Қараңғы', ru: 'Тёмная' },
   language: { kk: 'Тіл', ru: 'Язык' },
-  attribution: { kk: 'Yuujiso жасаған aitumap негізінде', ru: 'На основе aitumap от Yuujiso' },
-  attributionNote: {
-    kk: 'Based on aitumap by Yuujiso · MIT лицензиясы.',
-    ru: 'Based on aitumap by Yuujiso · Лицензия MIT.',
+  attributionNote: { kk: 'MIT лицензиясы.', ru: 'Лицензия MIT.' },
+  projectCredit: {
+    kk: 'Жоба: Tretorhate · tdk_college_map',
+    ru: 'Проект: Tretorhate · tdk_college_map',
   },
   licenseLink: { kk: 'Лицензия мәтіні', ru: 'Текст лицензии' },
   zoomIn: { kk: 'Үлкейту', ru: 'Приблизить' },

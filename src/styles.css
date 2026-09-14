@@ -87,11 +87,14 @@ a { color: #1479e8; }
 .room-details dt { color: var(--muted); }
 .room-details dd { margin: 0; text-align: right; }
 .settings-scrim { position: fixed; inset: 0; z-index: 50; background: #0005; }
-.settings-drawer { width: min(380px, calc(100% - 28px)); height: 100%; overflow: auto; padding: 20px; background: var(--panel); box-shadow: 5px 0 25px #0003; }
+.settings-drawer { display: flex; flex-direction: column; width: min(380px, calc(100% - 28px)); height: 100%; overflow: auto; padding: 20px; background: var(--panel); box-shadow: 5px 0 25px #0003; }
 .settings-row { display: flex; align-items: center; gap: 5px; margin-top: 20px; }
 .settings-row span { margin-right: auto; }
-.attribution { margin-top: 30px; }
-.attribution-note { color: var(--muted); font-size: 13px; }
+.drawer-footer { margin-top: auto; padding-top: 30px; }
+.footer-icons { display: flex; gap: 14px; margin: 0 0 10px; }
+.attribution-note { color: var(--muted); font-size: 13px; margin: 0; }
+.icon-link { color: var(--ink); display: inline-flex; }
+.icon-link:hover { color: #1479e8; }
 @media (max-width: 700px) {
   .top-strip { top: 12px; width: calc(100% - 24px); grid-template-columns: 125px minmax(0, 1fr); }
   .title-block { position: static; grid-column: 1 / -1; grid-row: 3; }
