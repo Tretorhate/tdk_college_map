@@ -33,6 +33,14 @@ export interface MapIcon {
   size?: number;
   label: LocalizedText;
 }
+export interface MapNote {
+  /** Stable plan-local note identifier. */
+  id: string;
+  /** Note anchor in the plan's SVG coordinate system. */
+  at: [number, number];
+  label: LocalizedText;
+}
+
 
 
 export interface FloorPlan {
@@ -54,6 +62,8 @@ export interface FloorPlan {
   stairs: string[];
   /** Reference-style facility markers backed by source-plan evidence. */
   icons?: MapIcon[];
+  /** Non-interactive evidence notes shown on the plan. */
+  notes?: MapNote[];
   /** Non-interactive light-gray escape/stair compartments shown as rooms. */
   technicalAreas?: string[];
   unclassifiedAreas: string[];

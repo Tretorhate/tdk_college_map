@@ -5,7 +5,7 @@ import { buildRoomIndex, searchRooms } from './lib/search.ts';
 import type { Locale } from './i18n.ts';
 import { LOCALE_STORAGE_KEY, documentTitle, t } from './i18n.ts';
 import MapCanvas from './components/MapCanvas.tsx';
-import MapControls, { type MainSection } from './components/MapControls.tsx';
+import MapControls from './components/MapControls.tsx';
 import RoomSearch from './components/RoomSearch.tsx';
 import RoomDetails from './components/RoomDetails.tsx';
 import SettingsDrawer from './components/SettingsDrawer.tsx';
@@ -23,8 +23,7 @@ function readLocale(): Locale {
 
 export default function App(): React.JSX.Element {
   const [buildingId, setBuildingId] = useState('main');
-  const [planId, setPlanId] = useState('main-horizontal-1');
-  const [mainSection, setMainSection] = useState<MainSection>('horizontal');
+  const [planId, setPlanId] = useState('main-floor-1');
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -73,9 +72,6 @@ export default function App(): React.JSX.Element {
     setBuildingId(id);
     const first = next.plans[0];
     setPlanId(first.id);
-    if (id === 'main') {
-      setMainSection(first.sectionId === 'l-shaped' ? 'l-shaped' : 'horizontal');
-    }
     setSelectedRoomId(null);
     setQuery('');
     setSearchOpen(false);
@@ -88,26 +84,8 @@ export default function App(): React.JSX.Element {
     setSearchOpen(false);
   }
 
-  function handleSection(section: MainSection): void {
-    const main = buildings.find((b) => b.id === 'main');
-    if (!main) return;
-    const currentFloor = plan.floor;
-    const inSection = main.plans.filter((p) => p.sectionId === section);
-    const sameFloor = currentFloor !== null ? inSection.find((p) => p.floor === currentFloor) : undefined;
-    const next = sameFloor ?? inSection[0];
-    if (!next) return;
-    setMainSection(section);
-    setPlanId(next.id);
-    setSelectedRoomId(null);
-    setQuery('');
-    setSearchOpen(false);
-  }
-
   function handlePick(m: RoomMatch): void {
     selectionOriginRef.current = searchInputRef.current;
-    if (m.building.id === 'main') {
-      setMainSection(m.plan.sectionId === 'l-shaped' ? 'l-shaped' : 'horizontal');
-    }
     setBuildingId(m.building.id);
     setPlanId(m.plan.id);
     setSelectedRoomId(m.room.id);
@@ -162,11 +140,9 @@ export default function App(): React.JSX.Element {
           buildings={buildings}
           buildingId={buildingId}
           planId={plan.id}
-          mainSection={mainSection}
           locale={locale}
           onBuilding={handleBuilding}
           onPlan={handlePlan}
-          onSection={handleSection}
         />
       </header>
       <main className="map-area">

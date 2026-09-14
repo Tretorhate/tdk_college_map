@@ -295,6 +295,19 @@ export default function MapCanvas({
                 {plan.icons?.map((icon) => (
                   <FacilityIcon key={icon.id} icon={icon} locale={locale} />
                 ))}
+                {plan.notes?.map((note) => (
+                  <text
+                    key={note.id}
+                    x={note.at[0]}
+                    y={note.at[1]}
+                    className="map-note"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    pointerEvents="none"
+                  >
+                    {note.label[locale]}
+                  </text>
+                ))}
               </svg>
             </TransformComponent>
           </>
