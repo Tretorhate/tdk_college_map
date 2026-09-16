@@ -68,6 +68,7 @@ a { color: #1479e8; }
 .map-room:is(#room-it-1-foyer, #room-it-1-canteen, #room-it-1-canteen-annex):not(.is-active) { fill: var(--circulation); }
 .map-technical { fill: #bfbfbf; }
 .map-toilet { fill: #ac7ab6; }
+.map-service { fill: var(--circulation); cursor: default; }
 .map-wall, .map-stairs { fill: none; stroke: var(--outline); stroke-width: 1.3; stroke-linecap: square; stroke-linejoin: miter; }
 .map-unclassified { fill: var(--circulation); stroke: none; }
 .map-technical-area { fill: #bfbfbf; stroke: var(--outline); stroke-width: 1.3; }

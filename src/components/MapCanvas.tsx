@@ -71,14 +71,6 @@ const TEMP_ROOM_TAGS: Record<string, string> = {
   'it-1-central-inner': 'C07',
   'it-1-central-corner': 'C08',
   'it-1-central-lower': 'C09',
-  'it-1-service-upper-west': 'S01',
-  'it-1-service-upper-middle': 'S02',
-  'it-1-service-upper-east': 'S03',
-  'it-1-service-upper-end': 'S04',
-  'it-1-service-lower-west': 'S05',
-  'it-1-service-lower-middle': 'S06',
-  'it-1-service-lower-east': 'S07',
-  'it-1-service-lower-end': 'S08',
   'it-2-act-hall': 'H01',
   'it-2-sport-hall': 'H02',
 };
@@ -227,12 +219,8 @@ export default function MapCanvas({
                 ))}
                 {plan.rooms.map((room) => {
                   const active = room.id === selectedRoomId || highlightIds.has(room.id);
-                  const cls =
-                    room.kind === 'toilet'
-                      ? 'map-room map-toilet'
-                      : room.kind === 'technical'
-                        ? 'map-room map-technical'
-                        : 'map-room';
+                  const interactive = room.kind !== 'service';
+                  const cls = `map-room${room.kind === 'room' ? '' : ` map-${room.kind}`}`;
                   const caption = ICON_ONLY_ROOM_IDS[room.id] ? '' : room.name[locale] || TEMP_ROOM_TAGS[room.id] || room.code;
                   return (
                     <g key={room.id}>
@@ -240,24 +228,37 @@ export default function MapCanvas({
                         id={`room-${room.id}`}
                         d={room.path}
                         className={active ? `${cls} is-active` : cls}
-                        tabIndex={0}
-                        role="button"
-                        aria-label={room.name[locale] || room.code || t(locale, 'unnamedRoom')}
-                        onPointerDown={(event) => {
-                          pointerOrigin.current = { x: event.clientX, y: event.clientY };
-                        }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const origin = pointerOrigin.current;
-                          if (e.detail > 0 && origin && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) return;
-                          onSelect(room.id);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onSelect(room.id);
-                          }
-                        }}
+                        pointerEvents={interactive ? undefined : 'none'}
+                        tabIndex={interactive ? 0 : undefined}
+                        role={interactive ? 'button' : undefined}
+                        aria-label={interactive ? room.name[locale] || room.code || t(locale, 'unnamedRoom') : undefined}
+                        onPointerDown={
+                          interactive
+                            ? (event) => {
+                                pointerOrigin.current = { x: event.clientX, y: event.clientY };
+                              }
+                            : undefined
+                        }
+                        onClick={
+                          interactive
+                            ? (e) => {
+                                e.stopPropagation();
+                                const origin = pointerOrigin.current;
+                                if (e.detail > 0 && origin && Math.hypot(e.clientX - origin.x, e.clientY - origin.y) > 5) return;
+                                onSelect(room.id);
+                              }
+                            : undefined
+                        }
+                        onKeyDown={
+                          interactive
+                            ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  onSelect(room.id);
+                                }
+                              }
+                            : undefined
+                        }
                       />
                       {caption ? (
                         <text
@@ -300,7 +301,8 @@ export default function MapCanvas({
                     key={note.id}
                     x={note.at[0]}
                     y={note.at[1]}
-                    className="map-note"
+                    className={note.prominent ? 'map-label' : 'map-note'}
+                    style={{ fontSize: note.size ?? (note.prominent ? vw / 65 : undefined) }}
                     textAnchor="middle"
                     dominantBaseline="central"
                     pointerEvents="none"

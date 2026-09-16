@@ -23,6 +23,9 @@ function firstRoom(
 ): Room {
   return { id: `it-1-${suffix}`, code, name, path, labelAt, kind, source: IT_SRC.it1 };
 }
+function serviceRoom(suffix: string, path: string, labelAt: [number, number]): Room {
+  return firstRoom(suffix, path, labelAt, '', blank, 'service');
+}
 
 // Manually traced from the plan at photo x239–890, y276–510.
 // Coordinates remove the small photographic skew, not the drawing's stepped edges.
@@ -99,6 +102,9 @@ const it1: FloorPlan = {
     { id: 'it-1-exit-west', kind: 'exit', at: [370, 558], size: 30, label: { kk: 'Шығу', ru: 'Выход' } },
     { id: 'it-1-exit-east', kind: 'exit', at: [1001, 558], size: 30, label: { kk: 'Шығу', ru: 'Выход' } },
   ],
+  notes: [
+    { id: 'it-1-service-block', at: [1420, 410], size: 18, prominent: true, label: { kk: 'Көмекші бөлмелер', ru: 'Подсобные помещения' } },
+  ],
   rooms: [
     firstRoom('library', rect(146, 25, 320, 113), [306, 81], '', { kk: 'Кітапхана', ru: 'Библиотека' }),
     firstRoom('bookfund', 'M146,192 H504 V313 H27 V254 H146 Z', [312, 253], '', { kk: 'Кітап қоймасы', ru: 'Книгохранилище' }),
@@ -125,14 +131,14 @@ const it1: FloorPlan = {
     firstRoom('central-corner', rect(1004, 178, 44, 54), [1026, 205], '', { kk: 'Электр қалқаны бөлмесі', ru: 'Электрощитовая' }),
     firstRoom('central-lower', 'M940,241 H1004 V232 H1048 V308 H940 Z', [993, 275], '', { kk: 'Мансап және жұмысқа орналастыру орталығы', ru: 'Центр карьеры и трудоустройства' }),
     firstRoom('kitchen-upper', rect(1169, 295, 109, 62), [1223, 326], '', { kk: 'Ыдыс жуу бөлмесі', ru: 'Моечная' }),
-    firstRoom('service-upper-west', rect(1305, 356, 74, 38), [1342, 375]),
-    firstRoom('service-upper-middle', rect(1379, 356, 39, 38), [1398, 375]),
-    firstRoom('service-upper-east', rect(1418, 356, 57, 38), [1446, 375]),
-    firstRoom('service-upper-end', rect(1475, 356, 60, 38), [1505, 375]),
-    firstRoom('service-lower-west', rect(1305, 425, 63, 82), [1336, 466]),
-    firstRoom('service-lower-middle', rect(1368, 425, 52, 82), [1394, 466]),
-    firstRoom('service-lower-east', rect(1420, 453, 58, 54), [1449, 480]),
-    firstRoom('service-lower-end', rect(1478, 453, 57, 54), [1506, 480]),
+    serviceRoom('service-upper-west', rect(1305, 356, 74, 38), [1342, 375]),
+    serviceRoom('service-upper-middle', rect(1379, 356, 39, 38), [1398, 375]),
+    serviceRoom('service-upper-east', rect(1418, 356, 57, 38), [1446, 375]),
+    serviceRoom('service-upper-end', rect(1475, 356, 60, 38), [1505, 375]),
+    serviceRoom('service-lower-west', rect(1305, 425, 63, 82), [1336, 466]),
+    serviceRoom('service-lower-middle', rect(1368, 425, 52, 82), [1394, 466]),
+    serviceRoom('service-lower-east', rect(1420, 453, 58, 54), [1449, 480]),
+    serviceRoom('service-lower-end', rect(1478, 453, 57, 54), [1506, 480]),
   ],
 };
 

@@ -3,7 +3,8 @@ export interface LocalizedText {
   ru: string;
 }
 
-export type RoomKind = 'room' | 'toilet' | 'technical';
+/** 'service' areas render on the plan but are not interactive (kitchen support/storage). */
+export type RoomKind = 'room' | 'toilet' | 'technical' | 'service';
 
 export interface Room {
   /** Globally unique, building/floor-qualified; never shown as a room code. */
@@ -38,6 +39,10 @@ export interface MapNote {
   id: string;
   /** Note anchor in the plan's SVG coordinate system. */
   at: [number, number];
+  /** Font size in plan units; defaults to the .map-note stylesheet size. */
+  size?: number;
+  /** Render as a visible area name (room-label styling) instead of a subtle annotation. */
+  prominent?: boolean;
   label: LocalizedText;
 }
 
