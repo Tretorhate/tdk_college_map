@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { buildings } from './data/buildings.ts';
+import { panoramaPoints } from './data/panoramas.ts';
 import type { RoomMatch } from './data/types.ts';
 import { buildRoomIndex, searchRooms } from './lib/search.ts';
 import type { Locale } from './i18n.ts';
@@ -9,6 +10,10 @@ import MapControls from './components/MapControls.tsx';
 import RoomSearch from './components/RoomSearch.tsx';
 import RoomDetails from './components/RoomDetails.tsx';
 import SettingsDrawer from './components/SettingsDrawer.tsx';
+import PanoramaErrorBoundary from './components/PanoramaErrorBoundary.tsx';
+import PanoramaFallbackDialog from './components/PanoramaFallbackDialog.tsx';
+
+const PanoramaViewer = lazy(() => import('./components/PanoramaViewer.tsx'));
 
 const roomIndex = buildRoomIndex(buildings);
 
@@ -31,15 +36,32 @@ export default function App(): React.JSX.Element {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [centerNonce, setCenterNonce] = useState(0);
+  const [activePanoramaId, setActivePanoramaId] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const settingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const selectionOriginRef = useRef<HTMLElement | SVGElement | null>(null);
+  const panoramaOriginRef = useRef<HTMLElement | SVGElement | null>(null);
 
   const building = buildings.find((b) => b.id === buildingId) ?? buildings[0];
   const plan = building.plans.find((p) => p.id === planId) ?? building.plans[0];
 
   const matches = useMemo(() => searchRooms(roomIndex, query), [query]);
   const highlightIds = useMemo(() => new Set(matches.map((m) => m.room.id)), [matches]);
+
+  const activePanorama = useMemo(
+    () => panoramaPoints.find((p) => p.id === activePanoramaId) ?? null,
+    [activePanoramaId],
+  );
+
+  useEffect(() => {
+    if (
+      activePanorama !== null &&
+      (activePanorama.buildingId !== building.id || activePanorama.planId !== plan.id)
+    ) {
+      setActivePanoramaId(null);
+      panoramaOriginRef.current = null;
+    }
+  }, [activePanorama, building.id, plan.id]);
 
   const selectedMatch: RoomMatch | null = useMemo(() => {
     if (selectedRoomId === null) return null;
@@ -75,6 +97,8 @@ export default function App(): React.JSX.Element {
     setSelectedRoomId(null);
     setQuery('');
     setSearchOpen(false);
+    setActivePanoramaId(null);
+    panoramaOriginRef.current = null;
   }
 
   function handlePlan(id: string): void {
@@ -82,6 +106,8 @@ export default function App(): React.JSX.Element {
     setSelectedRoomId(null);
     setQuery('');
     setSearchOpen(false);
+    setActivePanoramaId(null);
+    panoramaOriginRef.current = null;
   }
 
   function handlePick(m: RoomMatch): void {
@@ -92,6 +118,29 @@ export default function App(): React.JSX.Element {
     setCenterNonce((n) => n + 1);
     setSearchOpen(false);
     searchInputRef.current?.focus();
+    setActivePanoramaId(null);
+    panoramaOriginRef.current = null;
+  }
+
+  function handleOpenPanorama(pointId: string): void {
+    const point = panoramaPoints.find((p) => p.id === pointId);
+    if (!point || point.buildingId !== building.id || point.planId !== plan.id) return;
+    const active = document.activeElement;
+    panoramaOriginRef.current =
+      active instanceof HTMLElement || active instanceof SVGElement ? active : null;
+    setActivePanoramaId(point.id);
+  }
+
+  function handleClosePanorama(): void {
+    setActivePanoramaId(null);
+    requestAnimationFrame(() => {
+      const origin = panoramaOriginRef.current;
+      if (origin?.isConnected) {
+        origin.focus();
+      } else {
+        document.querySelector<HTMLElement>('.panorama-person')?.focus();
+      }
+    });
   }
 
   function handleSearchEscape(): void {
@@ -111,7 +160,7 @@ export default function App(): React.JSX.Element {
 
   return (
     <div className="app-shell">
-      <header className="top-strip">
+      <header className="top-strip" inert={activePanorama !== null}>
         <div className="title-block">
           <h1>{t(locale, 'title')}</h1>
           <button
@@ -145,9 +194,10 @@ export default function App(): React.JSX.Element {
           onPlan={handlePlan}
         />
       </header>
-      <main className="map-area">
+      <main className="map-area" inert={activePanorama !== null}>
         <MapCanvas
           locale={locale}
+          buildingId={building.id}
           plan={plan}
           selectedRoomId={selectedRoomId}
           highlightIds={highlightIds}
@@ -157,6 +207,7 @@ export default function App(): React.JSX.Element {
             setSelectedRoomId(id);
             setSearchOpen(false);
           }}
+          onOpenPanorama={handleOpenPanorama}
         />
         <RoomDetails
           match={selectedMatch}
@@ -165,18 +216,48 @@ export default function App(): React.JSX.Element {
           onEscape={handleDetailsClose}
         />
       </main>
-      <SettingsDrawer
-        open={settingsOpen}
-        locale={locale}
-        theme={theme}
-        onLocale={setLocale}
-        onTheme={setTheme}
-        onClose={() => {
-          setSettingsOpen(false);
-          settingsButtonRef.current?.focus();
-        }}
-        onEscape={handleSettingsEscape}
-      />
+      <div inert={activePanorama !== null} style={{ display: 'contents' }}>
+        <SettingsDrawer
+          open={settingsOpen}
+          locale={locale}
+          theme={theme}
+          onLocale={setLocale}
+          onTheme={setTheme}
+          onClose={() => {
+            setSettingsOpen(false);
+            settingsButtonRef.current?.focus();
+          }}
+          onEscape={handleSettingsEscape}
+        />
+      </div>
+      {activePanorama ? (
+        <PanoramaErrorBoundary
+          key={activePanorama.id}
+          fallback={
+            <PanoramaFallbackDialog
+              title={activePanorama.label[locale]}
+              message={t(locale, 'panoramaError')}
+              locale={locale}
+              tone="error"
+              onClose={handleClosePanorama}
+            />
+          }
+        >
+          <Suspense
+            fallback={
+              <PanoramaFallbackDialog
+                title={activePanorama.label[locale]}
+                message={t(locale, 'panoramaLoading')}
+                locale={locale}
+                tone="loading"
+                onClose={handleClosePanorama}
+              />
+            }
+          >
+            <PanoramaViewer point={activePanorama} locale={locale} onClose={handleClosePanorama} />
+          </Suspense>
+        </PanoramaErrorBoundary>
+      ) : null}
     </div>
   );
 }

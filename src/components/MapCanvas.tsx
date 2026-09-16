@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { t, type Locale } from '../i18n.ts';
+import { panoramasForPlan } from '../data/panoramas.ts';
 import type { FloorPlan, MapIcon } from '../data/types.ts';
 
 interface CenterRequest {
@@ -10,12 +11,14 @@ interface CenterRequest {
 }
 
 interface MapCanvasProps {
+  buildingId: string;
   plan: FloorPlan;
   locale: Locale;
   selectedRoomId: string | null;
   highlightIds: ReadonlySet<string>;
   centerRequest: CenterRequest | null;
   onSelect: (roomId: string | null) => void;
+  onOpenPanorama: (pointId: string) => void;
 }
 // TEMP reference tags for walkthrough; remove after labeling pass.
 // Keyed by room id, rendered as captions only — never enters search or data.
@@ -146,22 +149,144 @@ function FacilityIcon({ icon, locale }: { icon: MapIcon; locale: Locale }): Reac
   );
 }
 
+interface PanoramaGesture {
+  kind: 'person' | 'marker';
+  pointerId: number;
+  originX: number;
+  originY: number;
+  moved: boolean;
+  target: HTMLButtonElement | SVGGElement;
+  pointId: string | null;
+}
+
+interface PersonDrag {
+  x: number;
+  y: number;
+  moved: boolean;
+  candidateId: string | null;
+}
+
+function PanoramaPersonIcon(): React.JSX.Element {
+  return (
+    <>
+      <circle cx="12" cy="5" r="3" />
+      <path d="M12 9c-3 0-5 1.8-5 4.5V17h3l.7 5h2.6l.7-5h3v-3.5C17 10.8 15 9 12 9Z" />
+    </>
+  );
+}
+
 
 export default function MapCanvas({
+  buildingId,
   plan,
   locale,
   selectedRoomId,
   highlightIds,
   centerRequest,
   onSelect,
+  onOpenPanorama,
 }: MapCanvasProps): React.JSX.Element {
   const controlsRef = useRef<ReactZoomPanPinchRef | null>(null);
+  const canvasRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const personRef = useRef<HTMLButtonElement | null>(null);
+  const feedbackRef = useRef<HTMLParagraphElement | null>(null);
   const pointerOrigin = useRef<{ x: number; y: number } | null>(null);
+  const gestureRef = useRef<PanoramaGesture | null>(null);
+  const markerTapRef = useRef<string | null>(null);
+  const suppressClick = useRef(false);
+  const [screenScale, setScreenScale] = useState(1);
+  const [panoMode, setPanoMode] = useState(false);
+  const [drag, setDrag] = useState<PersonDrag | null>(null);
+  const [personHovered, setPersonHovered] = useState(false);
+  const [personFocused, setPersonFocused] = useState(false);
+  const [notice, setNotice] = useState<'unavailable' | 'miss' | null>(null);
+  const panoramaPoints = useMemo(() => panoramasForPlan(buildingId, plan.id), [buildingId, plan.id]);
+  const panoramaAvailable = panoramaPoints.length > 0;
+
+  const releaseGesture = useCallback(() => {
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+    gestureRef.current = null;
+    if (gesture.target.hasPointerCapture(gesture.pointerId)) {
+      gesture.target.releasePointerCapture(gesture.pointerId);
+    }
+    if (gesture.kind === 'person') setDrag(null);
+  }, []);
+
+  const cancelGesture = useCallback(() => {
+    if (!gestureRef.current) return;
+    suppressClick.current = true;
+    markerTapRef.current = null;
+    releaseGesture();
+  }, [releaseGesture]);
+
+  const updateScreenScale = useCallback(() => {
+    const ctm = svgRef.current?.getScreenCTM();
+    if (!ctm) return;
+    const scale = Math.hypot(ctm.a, ctm.b);
+    if (Number.isFinite(scale) && scale > 0) {
+      setScreenScale((previous) => previous === scale ? previous : scale);
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    cancelGesture();
+    void controlsRef.current?.resetTransform(0);
+    setPanoMode(false);
+    setNotice(null);
+    markerTapRef.current = null;
+    updateScreenScale();
+    return cancelGesture;
+  }, [buildingId, plan.id, cancelGesture, updateScreenScale]);
+
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    const canvas = canvasRef.current;
+    if (!svg || !canvas) return;
+    const observer = new ResizeObserver(updateScreenScale);
+    observer.observe(svg);
+    observer.observe(canvas);
+    updateScreenScale();
+    return () => observer.disconnect();
+  }, [updateScreenScale]);
 
   useEffect(() => {
-    controlsRef.current?.resetTransform(0);
-  }, [plan.id]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    // The transform library listens natively below React's event delegation.
+    // Capture legacy mouse/touch events before they can start a map gesture.
+    function blockMapGesture(event: Event): void {
+      const personDragging = gestureRef.current?.kind === 'person';
+      const onMarker = event.target instanceof Element && event.target.closest('.panorama-marker');
+      if (!personDragging && (!onMarker || event.type === 'wheel')) return;
+      if (personDragging && event.cancelable) event.preventDefault();
+      event.stopPropagation();
+    }
+    const events = ['mousedown', 'mousemove', 'touchstart', 'touchmove', 'wheel', 'dblclick'];
+    for (const event of events) canvas.addEventListener(event, blockMapGesture, { capture: true, passive: false });
+    window.addEventListener('blur', cancelGesture);
+    return () => {
+      for (const event of events) canvas.removeEventListener(event, blockMapGesture, true);
+      window.removeEventListener('blur', cancelGesture);
+    };
+  }, [cancelGesture]);
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent): void {
+      if (event.key !== 'Escape' || (!panoMode && !gestureRef.current)) return;
+      if (event.target instanceof Element && event.target.closest('dialog, [role="dialog"]')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      cancelGesture();
+      setPanoMode(false);
+      setNotice(null);
+      personRef.current?.focus({ preventScroll: true });
+    }
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
+  }, [panoMode, cancelGesture]);
+
 
   useEffect(() => {
     if (centerRequest === null) return;
@@ -178,33 +303,200 @@ export default function MapCanvas({
   }, [centerRequest?.roomId, centerRequest?.nonce]);
 
   const [vx, vy, vw, vh] = plan.viewBox;
+  const markerR = 24 / screenScale;
+  const feedbackVisible = notice !== null || personHovered || personFocused || panoMode;
+  const feedbackText = t(locale, !panoramaAvailable || notice === 'unavailable' ? 'panoramaUnavailable' : 'panoramaNoDrop');
+
+  function nearestCandidate(clientX: number, clientY: number): string | null {
+    const svg = svgRef.current;
+    const canvas = canvasRef.current?.getBoundingClientRect();
+    const ctm = svg?.getScreenCTM();
+    if (!svg || !canvas || !ctm) return null;
+    const feedback = feedbackRef.current?.classList.contains('is-visible')
+      ? feedbackRef.current.getBoundingClientRect()
+      : null;
+    function isVisibleMapPosition(x: number, y: number): boolean {
+      if (x < canvas!.left || x >= canvas!.right || y < canvas!.top || y >= canvas!.bottom) return false;
+      if (feedback && x >= feedback.left && x <= feedback.right && y >= feedback.top && y <= feedback.bottom) return false;
+      const topmost = document.elementFromPoint(x, y);
+      return topmost !== null && svg!.contains(topmost);
+    }
+    if (!isVisibleMapPosition(clientX, clientY)) return null;
+    let bestId: string | null = null;
+    let bestDistance = 24 * 24;
+    for (const point of panoramaPoints) {
+      const x = ctm.a * point.at[0] + ctm.c * point.at[1] + ctm.e;
+      const y = ctm.b * point.at[0] + ctm.d * point.at[1] + ctm.f;
+      const distance = (x - clientX) ** 2 + (y - clientY) ** 2;
+      if (distance > bestDistance || !isVisibleMapPosition(x, y)) continue;
+      if (distance < bestDistance || bestId === null || point.id < bestId) {
+        bestId = point.id;
+        bestDistance = distance;
+      }
+    }
+    return bestId;
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLButtonElement | SVGGElement>): void {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    gesture.moved ||= Math.hypot(event.clientX - gesture.originX, event.clientY - gesture.originY) > 5;
+    if (gesture.kind !== 'person' || !gesture.moved) return;
+    setPanoMode(true);
+    setDrag({
+      x: event.clientX,
+      y: event.clientY,
+      moved: true,
+      candidateId: nearestCandidate(event.clientX, event.clientY),
+    });
+  }
+
+  function handlePointerUp(event: React.PointerEvent<HTMLButtonElement | SVGGElement>): void {
+    const gesture = gestureRef.current;
+    if (!gesture || gesture.pointerId !== event.pointerId) return;
+    event.stopPropagation();
+    gesture.moved ||= Math.hypot(event.clientX - gesture.originX, event.clientY - gesture.originY) > 5;
+    const candidate = gesture.moved || gesture.kind === 'marker'
+      ? nearestCandidate(event.clientX, event.clientY)
+      : null;
+    if (gesture.moved) suppressClick.current = true;
+    if (gesture.kind === 'marker') {
+      markerTapRef.current = !gesture.moved && candidate === gesture.pointId ? gesture.pointId : null;
+      if (!markerTapRef.current) suppressClick.current = true;
+    }
+    releaseGesture();
+    if (gesture.kind === 'person' && gesture.moved) {
+      setPanoMode(true);
+      if (candidate) {
+        setNotice(null);
+        onOpenPanorama(candidate);
+      } else {
+        setNotice('miss');
+      }
+    }
+  }
+
+  function handlePointerCancel(event: React.PointerEvent<HTMLButtonElement | SVGGElement>): void {
+    if (gestureRef.current?.pointerId === event.pointerId) cancelGesture();
+  }
+
 
   return (
-    <div className="map-canvas" data-plan={plan.id}>
+    <div
+      ref={canvasRef}
+      className="map-canvas"
+      data-plan={plan.id}
+      onPointerDownCapture={(event) => {
+        if (gestureRef.current) {
+          if (gestureRef.current.pointerId !== event.pointerId) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          return;
+        }
+        if (event.isPrimary && event.button === 0) {
+          suppressClick.current = false;
+          markerTapRef.current = null;
+        }
+      }}
+      onClickCapture={(event) => {
+        if ((suppressClick.current && event.detail > 0) || gestureRef.current?.kind === 'person') {
+          event.preventDefault();
+          event.stopPropagation();
+          suppressClick.current = false;
+        }
+      }}
+    >
       <TransformWrapper
         ref={controlsRef}
         initialScale={1}
         minScale={0.4}
         maxScale={8}
         limitToBounds={false}
-        wheel={{ step: 0.15 }}
-        pinch={{ step: 5 }}
-        doubleClick={{ disabled: false, step: 0.7 }}
-        panning={{ velocityDisabled: true }}
+        disabled={drag !== null}
+        wheel={{ step: 0.15, disabled: drag !== null }}
+        pinch={{ step: 5, disabled: drag !== null }}
+        doubleClick={{ disabled: drag !== null, step: 0.7 }}
+        panning={{ velocityDisabled: true, disabled: drag !== null }}
+        onTransform={updateScreenScale}
       >
         {({ zoomIn, zoomOut, resetTransform }) => (
           <>
             <div className="zoom-controls" role="toolbar" aria-label={t(locale, 'fitView')}>
-              <button type="button" onClick={() => zoomIn(0.35)} aria-label={t(locale, 'zoomIn')}>
+              <button type="button" disabled={drag !== null} onClick={() => zoomIn(0.35)} aria-label={t(locale, 'zoomIn')}>
                 +
               </button>
-              <button type="button" onClick={() => zoomOut(0.35)} aria-label={t(locale, 'zoomOut')}>
+              <button type="button" disabled={drag !== null} onClick={() => zoomOut(0.35)} aria-label={t(locale, 'zoomOut')}>
                 −
               </button>
-              <button type="button" onClick={() => resetTransform(200)} aria-label={t(locale, 'fitView')}>
+              <button type="button" disabled={drag !== null} onClick={() => resetTransform(200)} aria-label={t(locale, 'fitView')}>
                 ⤢
               </button>
             </div>
+              <button
+                ref={personRef}
+                type="button"
+                className={`panorama-person${panoMode ? ' is-active' : ''}`}
+                aria-label={t(locale, 'panoramaControl')}
+                aria-describedby="panorama-feedback"
+                aria-disabled={!panoramaAvailable}
+                aria-pressed={panoMode}
+                title={feedbackText}
+                onPointerEnter={() => setPersonHovered(true)}
+                onPointerLeave={() => setPersonHovered(false)}
+                onFocus={() => setPersonFocused(true)}
+                onBlur={() => setPersonFocused(false)}
+                onPointerDown={(event) => {
+                  if (!event.isPrimary || event.button !== 0 || gestureRef.current || !panoramaAvailable) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.currentTarget.focus({ preventScroll: true });
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  gestureRef.current = {
+                    kind: 'person',
+                    pointerId: event.pointerId,
+                    originX: event.clientX,
+                    originY: event.clientY,
+                    moved: false,
+                    target: event.currentTarget,
+                    pointId: null,
+                  };
+                  setNotice(null);
+                  setDrag({ x: event.clientX, y: event.clientY, moved: false, candidateId: null });
+                }}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerCancel}
+                onLostPointerCapture={handlePointerCancel}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  if (!panoramaAvailable) {
+                    setNotice('unavailable');
+                    return;
+                  }
+                  setNotice(null);
+                  setPanoMode((mode) => !mode);
+                }}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <PanoramaPersonIcon />
+                </svg>
+              </button>
+              <p
+                ref={feedbackRef}
+                id="panorama-feedback"
+                className={`panorama-feedback${feedbackVisible ? ' is-visible' : ''}`}
+                role="status"
+              >
+                {feedbackText}
+              </p>
+              {drag?.moved ? (
+                <div className="panorama-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
+                  <svg viewBox="0 0 24 24" focusable="false">
+                    <PanoramaPersonIcon />
+                  </svg>
+                </div>
+              ) : null}
             <TransformComponent wrapperClass="map-transform-wrapper" contentClass="map-transform-content">
               <svg
                 ref={svgRef}
@@ -310,6 +602,59 @@ export default function MapCanvas({
                     {note.label[locale]}
                   </text>
                 ))}
+                {(panoMode || drag?.moved) &&
+                  panoramaPoints.map((p) => (
+                    <g
+                      key={p.id}
+                      className={`panorama-marker${drag?.candidateId === p.id ? ' is-candidate' : ''}`}
+                      transform={`translate(${p.at[0]} ${p.at[1]})`}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={p.label[locale]}
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                        if (!event.isPrimary || event.button !== 0 || gestureRef.current) return;
+                        event.preventDefault();
+                        event.currentTarget.focus({ preventScroll: true });
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                        gestureRef.current = {
+                          kind: 'marker',
+                          pointerId: event.pointerId,
+                          originX: event.clientX,
+                          originY: event.clientY,
+                          moved: false,
+                          target: event.currentTarget,
+                          pointId: p.id,
+                        };
+                      }}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={handlePointerUp}
+                      onPointerCancel={handlePointerCancel}
+                      onLostPointerCapture={handlePointerCancel}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (e.detail > 0 && markerTapRef.current !== p.id) return;
+                        markerTapRef.current = null;
+                        setNotice(null);
+                        onOpenPanorama(p.id);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (e.repeat || gestureRef.current) return;
+                          setNotice(null);
+                          onOpenPanorama(p.id);
+                        }
+                      }}
+                    >
+                      <circle r={markerR} className="panorama-marker-hit" />
+                      <circle r={markerR * 0.55} className="panorama-marker-dot" />
+                      <g transform={`scale(${1 / screenScale}) translate(-12 -12)`} className="panorama-marker-icon">
+                        <PanoramaPersonIcon />
+                      </g>
+                    </g>
+                  ))}
               </svg>
             </TransformComponent>
           </>

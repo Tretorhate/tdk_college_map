@@ -79,6 +79,70 @@ a { color: #1479e8; }
 .map-note { fill: var(--outline); font-size: 10px; font-style: italic; paint-order: stroke; stroke: var(--panel); stroke-width: 2px; stroke-opacity: .8; }
 .zoom-controls { position: absolute; right: 20px; bottom: 24px; display: flex; flex-direction: column; gap: 4px; z-index: 10; }
 .zoom-controls button { width: 40px; height: 40px; font-size: 20px; padding: 0; }
+.panorama-person {
+  position: absolute; right: 20px; bottom: 170px; z-index: 11;
+  width: 44px; height: 44px; padding: 7px;
+  border: 1px solid var(--line); border-radius: 50%;
+  background: var(--panel); box-shadow: 0 2px 12px #0002;
+  touch-action: none; user-select: none;
+}
+.panorama-person svg { display: block; width: 100%; height: 100%; fill: currentColor; }
+.panorama-person[aria-disabled='true'] { color: var(--muted); cursor: help; }
+.panorama-feedback {
+  position: absolute; right: 74px; bottom: 175px; z-index: 11;
+  max-width: min(280px, calc(100% - 150px)); margin: 0; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 9px;
+  background: var(--panel); color: var(--muted); font-size: 13px;
+  opacity: 0; pointer-events: none; transition: opacity 160ms ease;
+}
+.panorama-feedback.is-visible { opacity: 1; }
+.panorama-person.is-active { background: var(--active); color: var(--active-ink); }
+.panorama-ghost {
+  position: fixed; z-index: 60; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  pointer-events: none; color: #1479e8; filter: drop-shadow(0 2px 6px #0006);
+}
+.panorama-ghost svg { width: 100%; height: 100%; fill: currentColor; }
+.panorama-marker { cursor: pointer; outline: none; touch-action: none; user-select: none; }
+.panorama-marker-hit { fill: transparent; }
+.panorama-marker-dot { fill: #1479e8; stroke: #fff; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.panorama-marker-icon { fill: #fff; pointer-events: none; }
+.panorama-marker.is-candidate .panorama-marker-dot,
+.panorama-marker:hover .panorama-marker-dot,
+.panorama-marker:focus-visible .panorama-marker-dot { fill: #2fbf59; }
+.panorama-marker:focus-visible .panorama-marker-dot { stroke-width: 3; }
+.panorama-dialog {
+  position: fixed; inset: 0; z-index: 70;
+  margin: 0; border: 0; padding: 0;
+  width: 100%; height: 100%; max-width: none; max-height: none;
+  background: var(--bg); color: var(--ink);
+}
+.panorama-dialog[open] { display: flex; flex-direction: column; }
+.panorama-dialog::backdrop { background: #0008; }
+.panorama-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line);
+}
+.panorama-title { margin: 0; font-size: 16px; font-weight: 600; }
+.panorama-close { flex-shrink: 0; }
+.panorama-controls { display: flex; gap: 4px; }
+.panorama-controls button { min-width: 40px; min-height: 40px; padding: 0; font-size: 20px; }
+.panorama-instructions { margin: 0; padding: 7px 16px; color: var(--muted); font-size: 13px; }
+.panorama-stage { flex: 1; min-height: 0; position: relative; touch-action: none; outline: none; }
+.panorama-stage:focus-visible { outline: 2px solid #1479e8; outline-offset: -3px; }
+.panorama-stage .pnlm-container { width: 100%; height: 100%; }
+.panorama-stage .pnlm-load-box,
+.panorama-stage .pnlm-error-msg,
+.panorama-stage .pnlm-load-button,
+.panorama-stage .pnlm-about-msg { display: none !important; }
+.panorama-status {
+  position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%);
+  margin: 0; padding: 8px 14px; border-radius: 9px;
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink);
+  font-size: 14px; pointer-events: none;
+}
+.panorama-fallback .panorama-status { position: static; transform: none; margin: 24px auto; }
+.panorama-status-error { border-color: #d05a5a; color: #c0392b; }
+:root[data-theme='dark'] .panorama-status-error { border-color: #b45454; color: #ff9b9b; }
 .room-details { position: absolute; left: 20px; bottom: 24px; width: min(340px, calc(100% - 90px)); padding: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 8px 30px #0002; z-index: 15; }
 .details-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .details-head h2 { margin: 0; font-size: 18px; }
@@ -106,5 +170,7 @@ a { color: #1479e8; }
   .floor-row { right: 12px; }
   .zoom-controls { right: 12px; bottom: 22px; }
   .zoom-controls button { min-height: 44px; height: 44px; width: 44px; }
+  .panorama-person { left: auto; right: 12px; bottom: 178px; }
+  .panorama-feedback { left: auto; right: 64px; bottom: 183px; max-width: calc(100% - 140px); }
   .room-details { left: 12px; bottom: 22px; width: calc(100% - 80px); }
 }

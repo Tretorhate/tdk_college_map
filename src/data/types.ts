@@ -3,6 +3,24 @@ export interface LocalizedText {
   ru: string;
 }
 
+export interface PanoramaPoint {
+  /** Globally unique stable viewpoint identifier. */
+  id: string;
+  /** Existing building containing the photographed location. */
+  buildingId: string;
+  /** Existing displayed plan containing the photographed location. */
+  planId: string;
+  /** Camera position in the displayed plan's SVG coordinate system. */
+  at: [number, number];
+  label: LocalizedText;
+  /** Relative public path to a full-sphere equirectangular JPEG. */
+  image: string;
+  /** Initial horizontal direction in the exported image, normalized to [-180, 180]. */
+  initialYaw: number;
+  /** Initial vertical direction in the exported image, within [-90, 90]. */
+  initialPitch: number;
+}
+
 /** 'service' areas render on the plan but are not interactive (kitchen support/storage). */
 export type RoomKind = 'room' | 'toilet' | 'technical' | 'service';
 
